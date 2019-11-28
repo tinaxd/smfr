@@ -1,4 +1,5 @@
 pub mod types;
+pub mod file;
 
 #[cfg(test)]
 mod tests {
