@@ -111,11 +111,11 @@ impl SmfParser {
     fn parse_midi_event(&mut self) -> Result<MidiEvent> {
         let first_byte = self.reader.seek_bytes(1).ok_or(SmfError::new("unexpected None"))?.get(0).unwrap();
         if &0x80 <= first_byte && first_byte < &0xF0 {// Channel Messages
-            self.parse_channel_message()
+            MidiEvent::Midi(ChannelMessageself.parse_channel_message())
         } else if first_byte == &0xFF { // Meta Events
-            self.parse_meta_event()
+            MidiEvent::MetaEvent(self.parse_meta_event())
         } else if first_byte == &0xF0 || first_byte == &0xF7 { // SysEx
-            self.parse_sysex()
+            MidiEvent::SysExEvent(self.parse_sysex())
         } else {
             unimplemented!()
         }
@@ -139,7 +139,61 @@ impl SmfParser {
     }
 
     fn parse_channel_message(&mut self) -> Result<crate::types::message::MidiChannelMessage> {
-        unimplemented!()
+        use crate::types::message::ChannelVoiceMessage::*;
+        use crate::types::message::MidiChannelMessage;
+
+        let mut reader = self.reader;
+        let none_msg = SmfError::new("unexpected None");
+        let head = reader.next_bytes(1).ok_or(none_msg)?[0];
+        let cvm = match head {
+            0x80 ..= 0x8F => {
+                let channel = head - 0x80;
+                let key = reader.next_bytes(1).ok_or(none_msg)?[0];
+                let vel = reader.next_bytes(1).ok_or(none_msg)?[0];
+                Some(NoteOff{channel, key, vel})
+            },
+            0x90 ..= 0x9F => {
+                let channel = head - 0x90;
+                let key = reader.next_bytes(1).ok_or(none_msg)?[0];
+                let vel = reader.next_bytes(1).ok_or(none_msg)?[0];
+                Some(NoteOn{channel, key, vel})
+            },
+            0xA0 ..= 0xAF => {
+                let channel = head - 0xA0;
+                let key = reader.next_bytes(1).ok_or(none_msg)?[0];
+                let vel = reader.next_bytes(1).ok_or(none_msg)?[0];
+                Some(NoteOn{channel, key, vel})
+            },
+            0xB0 ..= 0xBF => { // TODO handling of ChannelModeMessage
+                let channel = head - 0xB0;
+                let cc = reader.next_bytes(1).ok_or(none_msg)?[0];
+                let value = reader.next_bytes(1).ok_or(none_msg)?[0];
+                Some(ControlChange{channel, cc, value})
+            }
+            0xC0 ..= 0xCF => {
+                let channel = head - 0xC0;
+                let pc = reader.next_bytes(1).ok_or(none_msg)?[0];
+                Some(ProgramChange{channel, pc})
+            },
+            0xD0 ..= 0xDF => {
+                let channel = head - 0xD0;
+                let vel = reader.next_bytes(1).ok_or(none_msg)?[0];
+                Some(ChannelKeyPressure{channel, vel})
+            },
+            0xE0 ..= 0xEF => {
+                let channel = head - 0xE0;
+                let msb = reader.next_bytes(1).ok_or(none_msg)?[0];
+                let lsb = reader.next_bytes(1).ok_or(none_msg)?[0];
+                Some(PitchBend{channel, msb, lsb})
+            }
+        };
+        if cvm.is_some() {
+            let cvm = cvm.unwrap();
+            return Ok(MidiChannelMessage::ChannelVoiceMessage(cvm));
+        }
+
+        // Start parsing ChannelModeMessage
+        unimplemented!();
     }
 
     fn parse_meta_event(&mut self) -> Result<crate::types::message::MetaEvent> {

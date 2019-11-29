@@ -35,8 +35,8 @@ pub trait SmfElement {
 
 #[derive(Debug)]
 pub enum MidiChannelMessage {
-    ChannelVoiceMessage{message: ChannelVoiceMessage},
-    ChannelModeMessage{message: ChannelModeMessage},
+    ChannelVoiceMessage(ChannelVoiceMessage),
+    ChannelModeMessage(ChannelModeMessage),
 }
 
 #[derive(Debug)]
@@ -44,8 +44,8 @@ pub enum ChannelVoiceMessage {
     NoteOff{channel: u8, key: u8, vel: u8},
     NoteOn{channel: u8, key: u8, vel: u8},
     PolyphonicKeyPressure{channel: u8, key: u8, vel: u8},
-    ControllerChange{channel: u8, cc: u8, value: u8},
-    ProgramChange{channel: u8, vel: u8},
+    ControlChange{channel: u8, cc: u8, value: u8},
+    ProgramChange{channel: u8, pc: u8},
     ChannelKeyPressure{channel: u8, vel: u8},
     PitchBend{channel: u8, lsb: u8, msb: u8}
 }
@@ -63,7 +63,7 @@ impl ChannelVoiceMessage {
             ChannelVoiceMessage::NoteOff{channel, ..} => channel,
             ChannelVoiceMessage::NoteOn{channel, ..} => channel,
             ChannelVoiceMessage::PolyphonicKeyPressure{channel, ..} => channel,
-            ChannelVoiceMessage::ControllerChange{channel, ..} => channel,
+            ChannelVoiceMessage::ControlChange{channel, ..} => channel,
             ChannelVoiceMessage::ProgramChange{channel, ..} => channel,
             ChannelVoiceMessage::ChannelKeyPressure{channel, ..} => channel,
             ChannelVoiceMessage::PitchBend{channel, ..} => channel
@@ -76,7 +76,7 @@ impl ChannelVoiceMessage {
             ChannelVoiceMessage::NoteOff{channel, ..} => 0x80 + channel,
             ChannelVoiceMessage::NoteOn{channel, ..} => 0x90 + channel,
             ChannelVoiceMessage::PolyphonicKeyPressure{channel, ..} => 0xA0 + channel,
-            ChannelVoiceMessage::ControllerChange{channel, ..} => 0xB0 + channel,
+            ChannelVoiceMessage::ControlChange{channel, ..} => 0xB0 + channel,
             ChannelVoiceMessage::ProgramChange{channel, ..} => 0xC0 + channel,
             ChannelVoiceMessage::ChannelKeyPressure{channel, ..} => 0xD0 + channel,
             ChannelVoiceMessage::PitchBend{channel, ..} => 0xE0 + channel
@@ -102,8 +102,8 @@ impl ChannelModeMessage {
 impl MidiChannelMessage {
     pub fn channel(&self) -> u8 {
         match self {
-            MidiChannelMessage::ChannelVoiceMessage{message} => message.channel(),
-            MidiChannelMessage::ChannelModeMessage{message} => message.channel()
+            MidiChannelMessage::ChannelVoiceMessage(message) => message.channel(),
+            MidiChannelMessage::ChannelModeMessage(message) => message.channel()
         }
     }
 }
@@ -115,8 +115,8 @@ impl SmfElement for ChannelVoiceMessage {
             NoteOn{key, vel, ..} => vec![self.status_byte(), key, vel],
             NoteOff{key, vel, ..} => vec![self.status_byte(), key, vel],
             PolyphonicKeyPressure{key, vel, ..} => vec![self.status_byte(), key, vel],
-            ControllerChange{cc, value, ..} => vec![self.status_byte(), cc, value],
-            ProgramChange{vel, ..} => vec![self.status_byte(), vel],
+            ControlChange{cc, value, ..} => vec![self.status_byte(), cc, value],
+            ProgramChange{pc, ..} => vec![self.status_byte(), pc],
             ChannelKeyPressure{vel, ..} => vec![self.status_byte(), vel],
             PitchBend{lsb, msb, ..} => vec![self.status_byte(), lsb, msb]
         }
@@ -137,8 +137,8 @@ impl SmfElement for ChannelModeMessage {
 impl SmfElement for MidiChannelMessage {
     fn raw(&self) -> std::vec::Vec<u8> {
         match self {
-            MidiChannelMessage::ChannelVoiceMessage{message} => message.raw(),
-            MidiChannelMessage::ChannelModeMessage{message} => message.raw()
+            MidiChannelMessage::ChannelVoiceMessage(message) => message.raw(),
+            MidiChannelMessage::ChannelModeMessage(message) => message.raw()
         }
     }
 }
