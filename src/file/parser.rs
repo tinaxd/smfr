@@ -109,7 +109,16 @@ impl SmfParser {
     }
 
     fn parse_midi_event(&mut self) -> Result<MidiEvent> {
-        unimplemented!()
+        let first_byte = self.reader.seek_bytes(1).ok_or(SmfError::new("unexpected None"))?.get(0).unwrap();
+        if &0x80 <= first_byte && first_byte < &0xF0 {// Channel Messages
+            self.parse_channel_message()
+        } else if first_byte == &0xFF { // Meta Events
+            self.parse_meta_event()
+        } else if first_byte == &0xF0 || first_byte == &0xF7 { // SysEx
+            self.parse_sysex()
+        } else {
+            unimplemented!()
+        }
     }
 
     /// Returns true if the next token is EndOfTrack.
@@ -127,5 +136,17 @@ impl SmfParser {
         } else {
             Ok(false)
         }
+    }
+
+    fn parse_channel_message(&mut self) -> Result<crate::types::message::MidiChannelMessage> {
+        unimplemented!()
+    }
+
+    fn parse_meta_event(&mut self) -> Result<crate::types::message::MetaEvent> {
+        unimplemented!()
+    }
+
+    fn parse_sysex(&mut self) -> Result<crate::types::message::SysExEvent> {
+        unimplemented!()
     }
 }
