@@ -37,6 +37,12 @@ impl SmfElement for EventPair {
     }
 }
 
+impl EventPair {
+    pub fn new(time: u32, event: MidiEvent) -> EventPair {
+        EventPair {time, event, }
+    }
+}
+
 // MThd and MTrk //
 
 #[derive(Debug)]

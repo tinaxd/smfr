@@ -53,13 +53,27 @@ impl SmfReader {
         if self.pointer + bytes >= self.data.len() {
             return None;
         }
-        let ret = &self.data[self.pointer..self.pointer + bytes];
+        let ret = &self.data[self.pointer .. self.pointer + bytes];
         self.pointer += bytes;
         Some(ret)
     }
 
     pub fn next_bytes(&mut self, bytes: usize) -> Option<Vec<u8>> {
         match self.next_bytes_ref(bytes) {
+            Some(x) => Some(x.to_vec()),
+            None => None
+        }
+    }
+
+    pub fn seek_bytes_ref(&self, bytes: usize) -> Option<&[u8]> {
+        if self.pointer + bytes >= self.data.len() {
+            return None;
+        }
+        Some(&self.data[self.pointer .. self.pointer + bytes])
+    }
+
+    pub fn seek_bytes(&self, bytes: usize) -> Option<Vec<u8>> {
+        match self.seek_bytes_ref(bytes) {
             Some(x) => Some(x.to_vec()),
             None => None
         }
