@@ -4,7 +4,7 @@ use super::super::types::event::*;
 
 type Result<T> = std::result::Result<T, SmfError>;
 
-struct SmfParser {
+pub struct SmfParser {
     reader: SmfReader,
 }
 
@@ -19,7 +19,7 @@ impl SmfParser {
             if header == &vec!['M' as u8, 'T' as u8, 'h' as u8, 'd' as u8][..] {
                 // MThd length format tracks timebase
 
-                let length     = self.reader.next_bytes(8);
+                let length     = self.reader.next_bytes(4);
                 let format     = self.reader.next_bytes(2);
                 let tracks     = self.reader.next_bytes(2);
                 let resolution = self.reader.next_bytes(2);
@@ -30,10 +30,10 @@ impl SmfParser {
                     let tracks     = tracks.unwrap();
                     let resolution = resolution.unwrap();
                     Ok(MidiChunk::HeaderChunk(HeaderChunk{
-                        length:     (length[0] << 3 + length[1] << 2 + length[2] << 1 + length[3]).into(),
-                        format:     (format[0] << 1 + format[1]).into(),
-                        tracks:     (tracks[0] << 1 + tracks[1]).into(),
-                        resolution: (resolution[0] << 1 + resolution[1]).into()
+                        length:     ((length[0] as u32) << 24) + ((length[1] as u32) << 16) + ((length[2] as u32) << 8) + (length[3] as u32),
+                        format:     ((format[0] as u16) << 8) + (format[1] as u16),
+                        tracks:     ((tracks[0] as u16) << 8) + (tracks[1] as u16),
+                        resolution: ((resolution[0] as u16) << 1) + (resolution[1] as u16)
                     }))
                 } else {
                     Err(SmfError::new("invalid MThd chunk info"))

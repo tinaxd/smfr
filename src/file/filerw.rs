@@ -38,7 +38,7 @@ impl SmfReader {
             return Err(SmfError{message: "File not found".to_string()})
         }
         
-        if let Ok(mut file) = File::create(filepath) {
+        if let Ok(mut file) = File::open(filepath) {
             let mut buf: Vec<u8> = Vec::new();
             match file.read_to_end(&mut buf) {
                 Ok(_) => Ok(SmfReader{data: buf, pointer: 0}),

@@ -2,6 +2,7 @@
 use super::message;
 use super::message::SmfElement;
 
+#[derive(Debug)]
 pub enum MidiEvent {
     MidiChannelMessage(message::MidiChannelMessage),
     MetaEvent(message::MetaEvent),
@@ -9,6 +10,7 @@ pub enum MidiEvent {
 }
 
 /// Represents a delta_time-event pair in SMF
+#[derive(Debug)]
 pub struct EventPair {
     time: u32, /// can be used as either delta time or absolute time
     event: MidiEvent
@@ -37,11 +39,13 @@ impl SmfElement for EventPair {
 
 // MThd and MTrk //
 
+#[derive(Debug)]
 pub enum MidiChunk {
     HeaderChunk(HeaderChunk),
     TrackChunk(TrackChunk)
 }
 
+#[derive(Debug)]
 pub struct HeaderChunk {
     pub length: u32, // should always be 0x00000006
     pub format: u16,
@@ -49,6 +53,7 @@ pub struct HeaderChunk {
     pub resolution: u16
 }
 
+#[derive(Debug)]
 pub struct TrackChunk {
     pub length: u32,
     pub events: std::vec::Vec<EventPair>

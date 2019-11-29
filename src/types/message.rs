@@ -33,11 +33,13 @@ pub trait SmfElement {
 
 // ChannelVoiceMessage and ChannelModeMessage //
 
+#[derive(Debug)]
 pub enum MidiChannelMessage {
     ChannelVoiceMessage{message: ChannelVoiceMessage},
     ChannelModeMessage{message: ChannelModeMessage},
 }
 
+#[derive(Debug)]
 pub enum ChannelVoiceMessage {
     NoteOff{channel: u8, key: u8, vel: u8},
     NoteOn{channel: u8, key: u8, vel: u8},
@@ -48,6 +50,7 @@ pub enum ChannelVoiceMessage {
     PitchBend{channel: u8, lsb: u8, msb: u8}
 }
 
+#[derive(Debug)]
 pub enum ChannelModeMessage {
     AllSoundOff{channel: u8},
     ResetAllControllers{channel: u8},
@@ -142,6 +145,7 @@ impl SmfElement for MidiChannelMessage {
 
 // Meta Events // 
 
+#[derive(Debug)]
 pub enum MetaEvent {
     SequenceNumber{number: u16},
     TextEvent{length: u32, text: std::vec::Vec<u8>},
@@ -199,6 +203,7 @@ impl SmfElement for MetaEvent {
 }
 
 // System Exclusive Events //
+#[derive(Debug)]
 pub enum SysExEvent {
     SysExF0{length: u32, data: std::vec::Vec<u8>},
     SysExF7{length: u32, data: std::vec::Vec<u8>}

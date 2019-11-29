@@ -4,6 +4,7 @@ pub mod file;
 #[cfg(test)]
 mod tests {
     use super::types::message;
+    use super::file::{filerw, parser};
 
     #[test]
     fn from_vlq_1() {
@@ -36,5 +37,41 @@ mod tests {
         let num = 1000;
         let expected = vec![0b10000111, 0b01101000];
         assert_eq!(message::to_vlq(num), expected);
+    }
+
+    #[test]
+    fn midi_parse_mthd() {
+        use std::path::Path;
+
+        println!("Current directory {:?}", std::env::current_dir().unwrap());
+        let reader = filerw::SmfReader::read_from_file(Path::new("test.mid"));
+        match reader {
+            Ok(r) => {
+                let mut parser = parser::SmfParser::new(r);
+                match parser.next_chunk() { // Read the first MThd chunk
+                    Ok(chunk) => {
+                        match chunk {
+                            super::types::event::MidiChunk::HeaderChunk(chunk) => {
+                                assert_eq!(chunk.length, 6);
+                                assert_eq!(chunk.tracks, 6);
+                                assert_eq!(chunk.format, 1);
+                                assert_eq!(chunk.resolution, 226);
+                            },
+                            _ => {
+                                panic!("Not MThd chunk!");
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        panic!("{}", e);
+                    }
+                }
+            },
+
+            Err(e) => {
+                panic!("{}", e);
+            }
+        }
+
     }
 }
