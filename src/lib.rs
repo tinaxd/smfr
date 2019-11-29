@@ -74,4 +74,39 @@ mod tests {
         }
 
     }
+
+    #[test]
+    #[ignore]
+    fn midi_parse_all() {
+        use std::path::Path;
+
+        println!("Current directory {:?}", std::env::current_dir().unwrap());
+        let reader = filerw::SmfReader::read_from_file(Path::new("test.mid"));
+        match reader {
+            Ok(r) => {
+                let mut parser = parser::SmfParser::new(r);
+                loop {
+                    match parser.next_chunk() {
+                        Ok(chunk) => {
+                            match chunk {
+                                super::types::event::MidiChunk::HeaderChunk(chunk) => {
+                                    println!("{:?}", chunk)
+                                },
+                                super::types::event::MidiChunk::TrackChunk(chunk) => {
+                                    println!("{:?}", chunk)
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            panic!("{}", e);
+                        }
+                    }
+                }
+            },
+
+            Err(e) => {
+                panic!("{}", e);
+            }
+        }
+    }
 }

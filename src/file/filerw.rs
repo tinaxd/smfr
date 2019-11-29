@@ -6,6 +6,14 @@ pub struct SmfError {
     message: String
 }
 
+impl Clone for SmfError {
+    fn clone(&self) -> Self {
+        SmfError {
+            message: self.message.clone()
+        }
+    }
+}
+
 impl SmfError {
     pub fn new(message: &str) -> SmfError {
         SmfError{message: message.to_string()}

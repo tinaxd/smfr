@@ -6,11 +6,12 @@ type Result<T> = std::result::Result<T, SmfError>;
 
 pub struct SmfParser {
     reader: SmfReader,
+    running_status: Option<u8>
 }
 
 impl SmfParser {
     pub fn new(reader: SmfReader) -> SmfParser {
-        SmfParser{reader}
+        SmfParser{reader, running_status: None}
     }
 
     pub fn next_chunk(&mut self) -> Result<MidiChunk> {
@@ -98,27 +99,30 @@ impl SmfParser {
                 Some(bytes) => {
                     let byte = bytes[0];
                     bin.push(byte);
-                    if byte > 128 {
+                    if byte >= 128 {
                         break;
                     }
                 },
                 None => return Err(SmfError::new("Error while reading VLQ"))
             }
         }
+        assert!(bin.len() <= 4, "too long: {}", bin.len());
         Ok(crate::types::message::from_vlq(&bin))
     }
 
     fn parse_midi_event(&mut self) -> Result<MidiEvent> {
-        let first_byte = self.reader.seek_bytes(1).ok_or(SmfError::new("unexpected None"))?.get(0).unwrap();
-        if &0x80 <= first_byte && first_byte < &0xF0 {// Channel Messages
-            MidiEvent::Midi(ChannelMessageself.parse_channel_message())
-        } else if first_byte == &0xFF { // Meta Events
-            MidiEvent::MetaEvent(self.parse_meta_event())
-        } else if first_byte == &0xF0 || first_byte == &0xF7 { // SysEx
-            MidiEvent::SysExEvent(self.parse_sysex())
+        let first_byte = self.reader.seek_bytes(1).ok_or(SmfError::new("unexpected None"))?[0];
+        let midi_event = if 0x80 <= first_byte && first_byte < 0xF0 {// Channel Messages
+            MidiEvent::MidiChannelMessage(self.parse_channel_message()?)
+        } else if first_byte == 0xFF { // Meta Events
+            MidiEvent::MetaEvent(self.parse_meta_event()?)
+        } else if first_byte == 0xF0 || first_byte == 0xF7 { // SysEx
+            MidiEvent::SysExEvent(self.parse_sysex()?)
         } else {
             unimplemented!()
-        }
+        };
+
+        Ok(midi_event)
     }
 
     /// Returns true if the next token is EndOfTrack.
@@ -142,50 +146,62 @@ impl SmfParser {
         use crate::types::message::ChannelVoiceMessage::*;
         use crate::types::message::MidiChannelMessage;
 
-        let mut reader = self.reader;
+        let reader = &mut self.reader;
         let none_msg = SmfError::new("unexpected None");
-        let head = reader.next_bytes(1).ok_or(none_msg)?[0];
+
+        let raw_head = reader.seek_bytes(1).ok_or(none_msg.clone())?[0];
+        // Check if status byte is omitted (running status)
+        let running_status_used =
+            if raw_head & 0b01000000 == 1 { true } else { false };
+        let head;
+        if running_status_used {
+            head = self.running_status.expect("running status is used but no status byte is recorded");
+        } else {
+            head = raw_head;
+        }
+
         let cvm = match head {
             0x80 ..= 0x8F => {
                 let channel = head - 0x80;
-                let key = reader.next_bytes(1).ok_or(none_msg)?[0];
-                let vel = reader.next_bytes(1).ok_or(none_msg)?[0];
+                let key = reader.next_bytes(1).ok_or(none_msg.clone())?[0];
+                let vel = reader.next_bytes(1).ok_or(none_msg.clone())?[0];
                 Some(NoteOff{channel, key, vel})
             },
             0x90 ..= 0x9F => {
                 let channel = head - 0x90;
-                let key = reader.next_bytes(1).ok_or(none_msg)?[0];
-                let vel = reader.next_bytes(1).ok_or(none_msg)?[0];
+                let key = reader.next_bytes(1).ok_or(none_msg.clone())?[0];
+                let vel = reader.next_bytes(1).ok_or(none_msg.clone())?[0];
                 Some(NoteOn{channel, key, vel})
             },
             0xA0 ..= 0xAF => {
                 let channel = head - 0xA0;
-                let key = reader.next_bytes(1).ok_or(none_msg)?[0];
-                let vel = reader.next_bytes(1).ok_or(none_msg)?[0];
+                let key = reader.next_bytes(1).ok_or(none_msg.clone())?[0];
+                let vel = reader.next_bytes(1).ok_or(none_msg.clone())?[0];
                 Some(NoteOn{channel, key, vel})
             },
             0xB0 ..= 0xBF => { // TODO handling of ChannelModeMessage
                 let channel = head - 0xB0;
-                let cc = reader.next_bytes(1).ok_or(none_msg)?[0];
-                let value = reader.next_bytes(1).ok_or(none_msg)?[0];
+                let cc = reader.next_bytes(1).ok_or(none_msg.clone())?[0];
+                let value = reader.next_bytes(1).ok_or(none_msg.clone())?[0];
                 Some(ControlChange{channel, cc, value})
             }
             0xC0 ..= 0xCF => {
                 let channel = head - 0xC0;
-                let pc = reader.next_bytes(1).ok_or(none_msg)?[0];
+                let pc = reader.next_bytes(1).ok_or(none_msg.clone())?[0];
                 Some(ProgramChange{channel, pc})
             },
             0xD0 ..= 0xDF => {
                 let channel = head - 0xD0;
-                let vel = reader.next_bytes(1).ok_or(none_msg)?[0];
+                let vel = reader.next_bytes(1).ok_or(none_msg.clone())?[0];
                 Some(ChannelKeyPressure{channel, vel})
             },
             0xE0 ..= 0xEF => {
                 let channel = head - 0xE0;
-                let msb = reader.next_bytes(1).ok_or(none_msg)?[0];
-                let lsb = reader.next_bytes(1).ok_or(none_msg)?[0];
+                let msb = reader.next_bytes(1).ok_or(none_msg.clone())?[0];
+                let lsb = reader.next_bytes(1).ok_or(none_msg.clone())?[0];
                 Some(PitchBend{channel, msb, lsb})
-            }
+            },
+            _ => None
         };
         if cvm.is_some() {
             let cvm = cvm.unwrap();
