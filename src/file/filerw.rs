@@ -38,6 +38,10 @@ pub struct SmfReader {
 }
 
 impl SmfReader {
+    pub fn reset_pointer(&mut self) {
+        self.pointer = 0;
+    }
+
     pub fn read_from_file(filepath: &std::path::Path) -> Result<SmfReader> {
         use std::fs::File;
         use std::io::Read;
@@ -86,4 +90,22 @@ impl SmfReader {
             None => None
         }
     }
+}
+
+pub fn write_to_file(filepath: &std::path::Path, smf: &crate::types::event::SMF, overwrite: bool) -> std::io::Result<()> {
+    use std::fs::OpenOptions;
+    use crate::types::message::SmfElement;
+    use std::io::BufWriter;
+    use std::io::Write;
+
+    if !overwrite && filepath.exists() {
+        return Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "Overwrite is disabled and file already exists"))
+    }
+    let file = OpenOptions::new().write(true).truncate(true).create(true).open(filepath)?;
+    let mut file = BufWriter::new(file);
+
+    let binary = smf.raw();
+
+    file.write(&binary)?;
+    Ok(())
 }

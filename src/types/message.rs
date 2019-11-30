@@ -1,5 +1,9 @@
 
 pub fn to_vlq(val: u32) -> std::vec::Vec<u8> {
+    if val == 0 {
+        return vec![0]
+    }
+
     let mut reverse_binary = std::vec::Vec::new();
     let mut rem = val;
     while rem != 0 {
@@ -156,6 +160,7 @@ pub enum MetaEvent {
     Marker{length: u32, text: std::vec::Vec<u8>},
     CuePoint{length: u32, text: std::vec::Vec<u8>},
     MIDIChannelPrefix{channel: u8},
+    SpecifyOutPort{port: u8},
     EndOfTrack,
     SetTempo{tempo: u32},
     SMPTEOffset{smpte: u32, frame: u8},
@@ -186,6 +191,7 @@ impl SmfElement for MetaEvent {
             Marker{length, text} => _helper(0x06, *length, text),
             CuePoint{length, text} => _helper(0x07, *length, text),
             MIDIChannelPrefix{channel} => vec![0xff, 0x20, 0x01, *channel],
+            SpecifyOutPort{port} => vec![0xff, 0x21, 0x01, *port],
             EndOfTrack => vec![0xff, 0x2f, 0x00],
             SetTempo{tempo} => vec![0xff, 0x51, 0x03, ((tempo & 0xFF0000) >> 16) as u8, ((tempo & 0x00FF00) >> 8) as u8, (tempo & 0x0000FF) as u8],
             SMPTEOffset{smpte, frame} => vec![0xff, 0x54 ,0x05, ((smpte & 0xFF000000) >> 24) as u8, ((smpte & 0x00FF0000) >> 16) as u8, ((smpte & 0x0000FF00) >> 8) as u8, (smpte & 0x000000FF) as u8, *frame],

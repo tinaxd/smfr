@@ -14,6 +14,45 @@ impl SmfParser {
         SmfParser{reader, running_status: None}
     }
 
+    pub fn reset(&mut self) {
+        self.running_status = None;
+        self.reader.reset_pointer();
+    }
+
+    pub fn read_all(&mut self) -> Result<crate::types::event::SMF> {
+
+        let header: HeaderChunk;
+        match self.next_chunk() {
+            Some(Ok(MidiChunk::HeaderChunk(ch))) => {
+                header = ch;
+            },
+            Some(Ok(MidiChunk::TrackChunk(_))) => {
+                return Err(SmfError::new("Expected MThd chunk, got MTrk chunk"))
+            },
+            Some(Err(e)) => return Err(e),
+            None => {
+                return Err(SmfError::new("Unexpected EOF"))
+            }
+        }
+
+        let mut tracks: Vec<TrackChunk> = Vec::new();
+        loop {
+            match self.next_chunk() {
+                Some(Ok(MidiChunk::HeaderChunk(_))) => {
+                    return Err(SmfError::new("Multiple MThd chunks"))
+                },
+                Some(Ok(MidiChunk::TrackChunk(tr))) => {
+                    tracks.push(tr)
+                },
+                Some(Err(e)) => return Err(e),
+
+                None => break, //EOF
+            }
+        }
+
+        Ok(SMF::new(header, tracks))
+    }
+
     pub fn next_chunk(&mut self) -> Option<Result<MidiChunk>> {
         if let Some(header) = self.reader.next_bytes(4) {
 
@@ -34,7 +73,7 @@ impl SmfParser {
                         length:     ((length[0] as u32) << 24) + ((length[1] as u32) << 16) + ((length[2] as u32) << 8) + (length[3] as u32),
                         format:     ((format[0] as u16) << 8) + (format[1] as u16),
                         tracks:     ((tracks[0] as u16) << 8) + (tracks[1] as u16),
-                        resolution: ((resolution[0] as u16) << 1) + (resolution[1] as u16)
+                        resolution: ((resolution[0] as u16) << 8) + (resolution[1] as u16)
                     })))
                 } else {
                     Some(Err(SmfError::new("invalid MThd chunk info")))
@@ -48,7 +87,7 @@ impl SmfParser {
 
                     match self.parse_mtrk_events() {
                         Ok(pairs) => {
-                            let length = ((length[0] as u32) << 3) + ((length[1] as u32) << 2) + ((length[2] as u32) << 1) + (length[3] as u32);
+                            let length = ((length[0] as u32) << 24) + ((length[1] as u32) << 17) + ((length[2] as u32) << 8) + (length[3] as u32);
                             Some(Ok(MidiChunk::TrackChunk(TrackChunk{
                                 length,
                                 events: pairs
@@ -97,7 +136,7 @@ impl SmfParser {
     pub fn parse_mtrk_event(&mut self) -> Result<EventPair> {
         let delta_time = self.parse_vlq()?;
         let event_part = self.parse_midi_event()?;
-        println!("{:?}", &event_part);
+        //println!("{:?}", &event_part);
         Ok(EventPair::new(
             delta_time,
             event_part
@@ -260,6 +299,13 @@ impl SmfParser {
                 }
             },
 
+            0x21 => { // Specify Out Port
+                let length = self.parse_vlq()?;
+                assert_eq!(length, 1);
+                let port = self.reader.next_bytes(1).ok_or(none_msg.clone())?;
+                Ok(SpecifyOutPort{port: port[0]})
+            }
+
             0x2F => { // End Of Track
                 let length = self.parse_vlq()?;
                 assert_eq!(length, 0);
@@ -312,7 +358,7 @@ impl SmfParser {
                 unimplemented!()
             },
 
-            _ => Err(SmfError::new("Unknown meta event"))
+            _ => Err(SmfError::new(&format!("Unknown meta event 0x{:X}", meta)))
         }
 
     }

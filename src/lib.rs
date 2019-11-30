@@ -96,15 +96,15 @@ mod tests {
                 loop {
                     match parser.next_chunk() {
                         Some(ck) => {
-                            
+
                             match ck {
                                 Ok(chunk) => {
                                     match chunk {
-                                        super::types::event::MidiChunk::HeaderChunk(chunk) => {
-                                            println!("{:?}", chunk)
+                                        super::types::event::MidiChunk::HeaderChunk(_chunk) => {
+                                            //println!("{:?}", chunk)
                                         },
-                                        super::types::event::MidiChunk::TrackChunk(chunk) => {
-                                            println!("{:?}", chunk)
+                                        super::types::event::MidiChunk::TrackChunk(_chunk) => {
+                                            //println!("{:?}", chunk)
                                         }
                                     }
                                 },
@@ -117,6 +117,12 @@ mod tests {
 
                         None => {
                             println!("Midi End!");
+                            parser.reset();
+                            let smf = parser.read_all().unwrap();
+                            //smf.merge_tracks();
+                            println!("{:?}", smf);
+                            println!("Writing to new file test_merged.mid");
+                            filerw::write_to_file(Path::new("test_merged.mid"), &smf, true).expect("Writing failed");
                             break;
                         }
                     }
