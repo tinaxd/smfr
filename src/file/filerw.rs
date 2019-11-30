@@ -58,7 +58,7 @@ impl SmfReader {
     }
 
     pub fn next_bytes_ref(&mut self, bytes: usize) -> Option<&[u8]> {
-        if self.pointer + bytes >= self.data.len() {
+        if self.pointer + bytes > self.data.len() {
             return None;
         }
         let ret = &self.data[self.pointer .. self.pointer + bytes];

@@ -44,11 +44,11 @@ impl SmfParser {
             } else if header == &vec!['M' as u8, 'T' as u8, 'r' as u8, 'k' as u8][..] {
                 // MTrk length mtrk_events
 
-                if let Some(length) = self.reader.next_bytes(8) {
+                if let Some(length) = self.reader.next_bytes(4) {
 
                     match self.parse_mtrk_events() {
                         Ok(pairs) => {
-                            let length = (length[0] << 3 + length[1] << 2 + length[2] << 1 + length[3]).into();
+                            let length = ((length[0] as u32) << 3) + ((length[1] as u32) << 2) + ((length[2] as u32) << 1) + (length[3] as u32);
                             Ok(MidiChunk::TrackChunk(TrackChunk{
                                 length,
                                 events: pairs
@@ -62,7 +62,7 @@ impl SmfParser {
                 }
 
             } else {
-                Err(SmfError::new("invalid midi chunk"))
+                Err(SmfError::new(&format!("invalid midi chunk {:?}", header)))
             }
 
         } else {
@@ -71,14 +71,25 @@ impl SmfParser {
     }
 
     pub fn parse_mtrk_events(&mut self) -> Result<Vec<EventPair>> {
+        use crate::types::message::MetaEvent::EndOfTrack;
+
         let mut pairs: Vec<EventPair> = Vec::new();
 
-        while !self.seek_if_track_end()? {
+        loop {
             let pair = self.parse_mtrk_event()?;
+            let event = pair.event_copy();
             pairs.push(pair);
+
+            match event {
+                MidiEvent::MetaEvent(me) => {
+                    match me {
+                        EndOfTrack => break,
+                        _ => continue,
+                    }
+                }
+                _ => continue,
+            }
         }
-        // skip EndOfTrack (3 bytes)
-        self.reader.next_bytes(3);
 
         Ok(pairs)
     }
@@ -86,6 +97,7 @@ impl SmfParser {
     pub fn parse_mtrk_event(&mut self) -> Result<EventPair> {
         let delta_time = self.parse_vlq()?;
         let event_part = self.parse_midi_event()?;
+        println!("{:?}", &event_part);
         Ok(EventPair::new(
             delta_time,
             event_part
@@ -99,11 +111,11 @@ impl SmfParser {
                 Some(bytes) => {
                     let byte = bytes[0];
                     bin.push(byte);
-                    if byte >= 128 {
+                    if byte < 128 {
                         break;
                     }
                 },
-                None => return Err(SmfError::new("Error while reading VLQ"))
+                None => return Err(SmfError::new(&format!("Error while reading VLQ {:?}", &bin)))
             }
         }
         assert!(bin.len() <= 4, "too long: {}", bin.len());
@@ -119,7 +131,7 @@ impl SmfParser {
         } else if first_byte == 0xF0 || first_byte == 0xF7 { // SysEx
             MidiEvent::SysExEvent(self.parse_sysex()?)
         } else {
-            unimplemented!()
+            MidiEvent::MidiChannelMessage(self.parse_channel_message()?) // Channel Messages with running status
         };
 
         Ok(midi_event)
@@ -135,6 +147,7 @@ impl SmfParser {
         }
 
         let three = three.unwrap();
+        println!("{:?}", &three);
         if three == [0xFF, 0x2F, 0x00] {
             Ok(true)
         } else {
@@ -152,12 +165,14 @@ impl SmfParser {
         let raw_head = reader.seek_bytes(1).ok_or(none_msg.clone())?[0];
         // Check if status byte is omitted (running status)
         let running_status_used =
-            if raw_head & 0b01000000 == 1 { true } else { false };
+            raw_head < 0x80;
         let head;
         if running_status_used {
             head = self.running_status.expect("running status is used but no status byte is recorded");
         } else {
+            reader.next_bytes(1).unwrap(); // Consume status byte
             head = raw_head;
+            self.running_status = Some(head)
         }
 
         let cvm = match head {
@@ -213,7 +228,93 @@ impl SmfParser {
     }
 
     fn parse_meta_event(&mut self) -> Result<crate::types::message::MetaEvent> {
-        unimplemented!()
+        use crate::types::message::MetaEvent::*;
+
+        let none_msg = SmfError::new("unexpected None");
+        {
+            let first = self.reader.next_bytes(1).ok_or(none_msg.clone())?[0];
+            assert_eq!(first, 0xFF);
+        }
+        let meta = self.reader.next_bytes(1).ok_or(none_msg.clone())?[0];
+        match meta {
+            0x00 => { // Sequence Number
+                let length = self.parse_vlq()?;
+                assert_eq!(length, 2);
+                let data = self.reader.next_bytes(2).ok_or(none_msg.clone())?;
+                let number = ((data[0] as u16) << 8) + (data[1] as u16);
+                Ok(SequenceNumber{number})
+            },
+
+            0x01 ..= 0x09 => { // Text related
+                let length = self.parse_vlq()?;
+                let text = self.reader.next_bytes(length as usize).ok_or(none_msg.clone())?;
+                match meta {
+                    0x01 => Ok(TextEvent{length, text}),
+                    0x02 => Ok(CopyrightNotice{length, text}),
+                    0x03 => Ok(SequenceTrackName{length, text}),
+                    0x04 => Ok(InstrumentName{length, text}),
+                    0x05 => Ok(Lyric{length, text}),
+                    0x06 => Ok(Marker{length, text}),
+                    0x07 => Ok(CuePoint{length, text}),
+                    _ => unreachable!()
+                }
+            },
+
+            0x2F => { // End Of Track
+                let length = self.parse_vlq()?;
+                assert_eq!(length, 0);
+                //let _data = self.reader.next_bytes(1).ok_or(SmfError::new("Invalid EndOfTrack"))?;
+                Ok(EndOfTrack)
+            },
+
+            0x51 => { // Set Tempo
+                let length = self.parse_vlq()?;
+                assert_eq!(length, 3);
+                let data = self.reader.next_bytes(3).ok_or(none_msg.clone())?;
+                let tempo = ((data[0] as u32) << 16) + ((data[1] as u32) << 8) + (data[2] as u32);
+                Ok(SetTempo{tempo})
+            },
+
+            0x54 => { // SMPTE Offset
+                let length = self.parse_vlq()?;
+                assert_eq!(length, 5);
+                let data = self.reader.next_bytes(5).ok_or(none_msg.clone())?;
+                let smpte = ((data[0] as u32) << 24) + ((data[1] as u32) << 16) + ((data[2] as u32) << 8) + (data[3] as u32);
+                let frame = data[5] as u8;
+                Ok(SMPTEOffset{smpte, frame})
+            },
+
+            0x58 => { // Time Signature
+                let length = self.parse_vlq()?;
+                assert_eq!(length, 4);
+                let data = self.reader.next_bytes(4).ok_or(none_msg.clone())?;
+                Ok(TimeSignature{
+                    numerator: data[0],
+                    denominator: data[1],
+                    clocks: data[2],
+                    notes: data[3],
+                })
+            },
+
+            0x59 => { // Key Signture
+                let length = self.parse_vlq()?;
+                assert_eq!(length, 2);
+                let data = self.reader.next_bytes(2).ok_or(none_msg.clone())?;
+                Ok(KeySignature{
+                    sf: data[0],
+                    minor: data[1],
+                })
+            },
+
+            0x7F => { // Sequencer-Specific Meta Event
+                let length = self.parse_vlq()?;
+                let _data = self.reader.next_bytes(length as usize).ok_or(none_msg.clone())?;
+                unimplemented!()
+            },
+
+            _ => Err(SmfError::new("Unknown meta event"))
+        }
+
     }
 
     fn parse_sysex(&mut self) -> Result<crate::types::message::SysExEvent> {

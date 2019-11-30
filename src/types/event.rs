@@ -2,7 +2,7 @@
 use super::message;
 use super::message::SmfElement;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MidiEvent {
     MidiChannelMessage(message::MidiChannelMessage),
     MetaEvent(message::MetaEvent),
@@ -40,6 +40,14 @@ impl SmfElement for EventPair {
 impl EventPair {
     pub fn new(time: u32, event: MidiEvent) -> EventPair {
         EventPair {time, event, }
+    }
+
+    pub fn event_copy(&self) -> MidiEvent {
+        self.event.clone()
+    }
+
+    pub fn event(&self) -> &MidiEvent {
+        &self.event
     }
 }
 

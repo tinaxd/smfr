@@ -33,13 +33,13 @@ pub trait SmfElement {
 
 // ChannelVoiceMessage and ChannelModeMessage //
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MidiChannelMessage {
     ChannelVoiceMessage(ChannelVoiceMessage),
     ChannelModeMessage(ChannelModeMessage),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ChannelVoiceMessage {
     NoteOff{channel: u8, key: u8, vel: u8},
     NoteOn{channel: u8, key: u8, vel: u8},
@@ -50,7 +50,7 @@ pub enum ChannelVoiceMessage {
     PitchBend{channel: u8, lsb: u8, msb: u8}
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ChannelModeMessage {
     AllSoundOff{channel: u8},
     ResetAllControllers{channel: u8},
@@ -145,7 +145,7 @@ impl SmfElement for MidiChannelMessage {
 
 // Meta Events // 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MetaEvent {
     SequenceNumber{number: u16},
     TextEvent{length: u32, text: std::vec::Vec<u8>},
@@ -158,7 +158,7 @@ pub enum MetaEvent {
     MIDIChannelPrefix{channel: u8},
     EndOfTrack,
     SetTempo{tempo: u32},
-    SMTPEOffset{smtpe: u32, frame: u8},
+    SMPTEOffset{smpte: u32, frame: u8},
     TimeSignature{numerator: u8, denominator: u8, clocks: u8, notes: u8},
     KeySignature{sf: u8, minor: u8},
     SequencerSpecific{length: u32, id: u8, data: u8}
@@ -177,7 +177,7 @@ impl SmfElement for MetaEvent {
 
         use MetaEvent::*;
         match self {
-            SequenceNumber{number} => vec![0xff, 0x00, 0x02, (number & 0b1100) as u8, (number & 0b0011) as u8],
+            SequenceNumber{number} => vec![0xff, 0x00, 0x02, ((number & 0xFF00) >> 8) as u8, (number & 0x00FF) as u8],
             TextEvent{length, text} => _helper(0x01, *length, text),
             CopyrightNotice{length, text} => _helper(0x02, *length, text),
             SequenceTrackName{length, text} => _helper(0x03, *length, text),
@@ -187,8 +187,8 @@ impl SmfElement for MetaEvent {
             CuePoint{length, text} => _helper(0x07, *length, text),
             MIDIChannelPrefix{channel} => vec![0xff, 0x20, 0x01, *channel],
             EndOfTrack => vec![0xff, 0x2f, 0x00],
-            SetTempo{tempo} => vec![0xff, 0x51, 0x03, (tempo & 0b110000) as u8, (tempo & 0b001100) as u8, (tempo & 0b000011) as u8],
-            SMTPEOffset{smtpe, frame} => vec![0xff, 0x54 ,0x05, (smtpe & 0b11000000) as u8, (smtpe & 0b00110000) as u8, (smtpe & 0b00001100) as u8, (smtpe & 0b00000011) as u8, *frame],
+            SetTempo{tempo} => vec![0xff, 0x51, 0x03, ((tempo & 0xFF0000) >> 16) as u8, ((tempo & 0x00FF00) >> 8) as u8, (tempo & 0x0000FF) as u8],
+            SMPTEOffset{smpte, frame} => vec![0xff, 0x54 ,0x05, ((smpte & 0xFF000000) >> 24) as u8, ((smpte & 0x00FF0000) >> 16) as u8, ((smpte & 0x0000FF00) >> 8) as u8, (smpte & 0x000000FF) as u8, *frame],
             TimeSignature{numerator, denominator, clocks, notes} => vec![0xff, 0x58, 0x04, *numerator, *denominator, *clocks, *notes],
             KeySignature{sf, minor} => vec![0xff, 0x59, 0x02, *sf, *minor],
             SequencerSpecific{length, id, data} => {
@@ -203,7 +203,7 @@ impl SmfElement for MetaEvent {
 }
 
 // System Exclusive Events //
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SysExEvent {
     SysExF0{length: u32, data: std::vec::Vec<u8>},
     SysExF7{length: u32, data: std::vec::Vec<u8>}
