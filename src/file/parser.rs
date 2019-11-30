@@ -217,6 +217,20 @@ impl SmfParser {
     }
 
     fn parse_sysex(&mut self) -> Result<crate::types::message::SysExEvent> {
-        unimplemented!()
+        use crate::types::message::SysExEvent;
+
+        match self.reader.next_bytes(1).map(|i| {i[0]}) {
+            Some(0xF0) => {
+                let length = self.parse_vlq()?;
+                let data =  self.reader.next_bytes(length as usize).ok_or(SmfError::new("unexpected None"))?; // data ends with 0xF7
+                Ok(SysExEvent::SysExF0{length, data})
+            },
+            Some(0xF7) => {
+                let length = self.parse_vlq()?;
+                let data = self.reader.next_bytes(length as usize).ok_or(SmfError::new("unexpected None"))?;
+                Ok(SysExEvent::SysExF7{length, data})
+            },
+            _ => Err(SmfError::new("error parsing SysEx"))
+        }
     }
 }
