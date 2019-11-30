@@ -49,21 +49,29 @@ mod tests {
             Ok(r) => {
                 let mut parser = parser::SmfParser::new(r);
                 match parser.next_chunk() { // Read the first MThd chunk
-                    Ok(chunk) => {
-                        match chunk {
-                            super::types::event::MidiChunk::HeaderChunk(chunk) => {
-                                assert_eq!(chunk.length, 6);
-                                assert_eq!(chunk.tracks, 6);
-                                assert_eq!(chunk.format, 1);
-                                assert_eq!(chunk.resolution, 226);
+                    Some(ck) => {
+                        match ck {
+                            Ok(chunk) => {
+                                match chunk {
+                                    super::types::event::MidiChunk::HeaderChunk(chunk) => {
+                                        assert_eq!(chunk.length, 6);
+                                        assert_eq!(chunk.tracks, 6);
+                                        assert_eq!(chunk.format, 1);
+                                        assert_eq!(chunk.resolution, 226);
+                                    },
+                                    _ => {
+                                        panic!("Not MThd chunk!");
+                                    }
+                                }
+                                ()
                             },
-                            _ => {
-                                panic!("Not MThd chunk!");
+                            Err(e) => {
+                                panic!("{}", e);
                             }
                         }
                     },
-                    Err(e) => {
-                        panic!("{}", e);
+                    None => {
+                        println!("Midi End!");
                     }
                 }
             },
@@ -87,18 +95,29 @@ mod tests {
                 let mut parser = parser::SmfParser::new(r);
                 loop {
                     match parser.next_chunk() {
-                        Ok(chunk) => {
-                            match chunk {
-                                super::types::event::MidiChunk::HeaderChunk(chunk) => {
-                                    println!("{:?}", chunk)
+                        Some(ck) => {
+                            
+                            match ck {
+                                Ok(chunk) => {
+                                    match chunk {
+                                        super::types::event::MidiChunk::HeaderChunk(chunk) => {
+                                            println!("{:?}", chunk)
+                                        },
+                                        super::types::event::MidiChunk::TrackChunk(chunk) => {
+                                            println!("{:?}", chunk)
+                                        }
+                                    }
                                 },
-                                super::types::event::MidiChunk::TrackChunk(chunk) => {
-                                    println!("{:?}", chunk)
+                                Err(e) => {
+                                    panic!("{}", e);
                                 }
                             }
+
                         },
-                        Err(e) => {
-                            panic!("{}", e);
+
+                        None => {
+                            println!("Midi End!");
+                            break;
                         }
                     }
                 }

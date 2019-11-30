@@ -14,7 +14,7 @@ impl SmfParser {
         SmfParser{reader, running_status: None}
     }
 
-    pub fn next_chunk(&mut self) -> Result<MidiChunk> {
+    pub fn next_chunk(&mut self) -> Option<Result<MidiChunk>> {
         if let Some(header) = self.reader.next_bytes(4) {
 
             if header == &vec!['M' as u8, 'T' as u8, 'h' as u8, 'd' as u8][..] {
@@ -30,14 +30,14 @@ impl SmfParser {
                     let format     = format.unwrap();
                     let tracks     = tracks.unwrap();
                     let resolution = resolution.unwrap();
-                    Ok(MidiChunk::HeaderChunk(HeaderChunk{
+                    Some(Ok(MidiChunk::HeaderChunk(HeaderChunk{
                         length:     ((length[0] as u32) << 24) + ((length[1] as u32) << 16) + ((length[2] as u32) << 8) + (length[3] as u32),
                         format:     ((format[0] as u16) << 8) + (format[1] as u16),
                         tracks:     ((tracks[0] as u16) << 8) + (tracks[1] as u16),
                         resolution: ((resolution[0] as u16) << 1) + (resolution[1] as u16)
-                    }))
+                    })))
                 } else {
-                    Err(SmfError::new("invalid MThd chunk info"))
+                    Some(Err(SmfError::new("invalid MThd chunk info")))
                 }
                 
 
@@ -49,24 +49,24 @@ impl SmfParser {
                     match self.parse_mtrk_events() {
                         Ok(pairs) => {
                             let length = ((length[0] as u32) << 3) + ((length[1] as u32) << 2) + ((length[2] as u32) << 1) + (length[3] as u32);
-                            Ok(MidiChunk::TrackChunk(TrackChunk{
+                            Some(Ok(MidiChunk::TrackChunk(TrackChunk{
                                 length,
                                 events: pairs
-                            }))
+                            })))
                         },
-                        Err(e) => Err(e)
+                        Err(e) => Some(Err(e))
                     }
 
                 } else {
-                    Err(SmfError::new("invalid MTrk length"))
+                    Some(Err(SmfError::new("invalid MTrk length")))
                 }
 
             } else {
-                Err(SmfError::new(&format!("invalid midi chunk {:?}", header)))
+                Some(Err(SmfError::new(&format!("invalid midi chunk {:?}", header))))
             }
 
         } else {
-            Err(SmfError::new("midi chunk not found (midi file too short)"))
+            None
         }
     }
 
