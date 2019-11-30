@@ -44,7 +44,7 @@ mod tests {
         use std::path::Path;
 
         println!("Current directory {:?}", std::env::current_dir().unwrap());
-        let reader = filerw::SmfReader::read_from_file(Path::new("test.mid"));
+        let reader = filerw::SmfReader::read_from_file(Path::new("testres/test.mid"));
         match reader {
             Ok(r) => {
                 let mut parser = parser::SmfParser::new(r);
@@ -57,7 +57,7 @@ mod tests {
                                         assert_eq!(chunk.length, 6);
                                         assert_eq!(chunk.tracks, 6);
                                         assert_eq!(chunk.format, 1);
-                                        assert_eq!(chunk.resolution, 226);
+                                        assert_eq!(chunk.resolution, 480);
                                     },
                                     _ => {
                                         panic!("Not MThd chunk!");
@@ -89,7 +89,7 @@ mod tests {
         use std::path::Path;
 
         println!("Current directory {:?}", std::env::current_dir().unwrap());
-        let reader = filerw::SmfReader::read_from_file(Path::new("test.mid"));
+        let reader = filerw::SmfReader::read_from_file(Path::new("testres/test.mid"));
         match reader {
             Ok(r) => {
                 let mut parser = parser::SmfParser::new(r);
@@ -122,7 +122,7 @@ mod tests {
                             //smf.merge_tracks();
                             println!("{:?}", smf);
                             println!("Writing to new file test_merged.mid");
-                            filerw::write_to_file(Path::new("test_merged.mid"), &smf, true).expect("Writing failed");
+                            filerw::write_to_file(Path::new("testres/test_merged.mid"), &smf, true).expect("Writing failed");
                             break;
                         }
                     }

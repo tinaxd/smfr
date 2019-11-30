@@ -12,8 +12,9 @@ pub enum MidiEvent {
 /// Represents a delta_time-event pair in SMF
 #[derive(Debug, Clone)]
 pub struct EventPair {
-    time: u32, /// can be used as either delta time or absolute time
-    event: MidiEvent
+    time: u32, // delta_time (tick)
+    event: MidiEvent,
+    absolute_tick: Option<u32>
 }
 
 impl SmfElement for MidiEvent {
@@ -39,7 +40,7 @@ impl SmfElement for EventPair {
 
 impl EventPair {
     pub fn new(time: u32, event: MidiEvent) -> EventPair {
-        EventPair {time, event, }
+        EventPair {time, event, absolute_tick: None}
     }
 
     pub fn event_copy(&self) -> MidiEvent {
@@ -138,6 +139,15 @@ impl TrackChunk {
     pub fn len(&self) -> usize {
         self.events.len()
     }
+
+    /// Update length field by calculating the sum of event length
+    pub fn recalculate_length(&mut self) {
+        self.length = self.events.iter().fold(0, |acc, event| { acc + (event.raw().len() as u32)});
+    }
+
+    pub fn compute_absolute_tick(&mut self) {
+        unimplemented!()
+    }
 }
 
 impl SmfElement for MidiChunk {
@@ -212,5 +222,15 @@ impl SMF {
             length: sum_length,
             events: merged,
         }];
+    }
+
+    pub fn recalculate_length(&mut self) {
+        for track in &mut self.tracks {
+            track.recalculate_length();
+        }
+    }
+
+    pub fn compute_absolute_tick(&mut self) {
+        unimplemented!()
     }
 }

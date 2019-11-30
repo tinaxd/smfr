@@ -87,7 +87,7 @@ impl SmfParser {
 
                     match self.parse_mtrk_events() {
                         Ok(pairs) => {
-                            let length = ((length[0] as u32) << 24) + ((length[1] as u32) << 17) + ((length[2] as u32) << 8) + (length[3] as u32);
+                            let length = ((length[0] as u32) << 24) + ((length[1] as u32) << 16) + ((length[2] as u32) << 8) + (length[3] as u32);
                             Some(Ok(MidiChunk::TrackChunk(TrackChunk{
                                 length,
                                 events: pairs

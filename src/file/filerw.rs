@@ -104,6 +104,8 @@ pub fn write_to_file(filepath: &std::path::Path, smf: &crate::types::event::SMF,
     let file = OpenOptions::new().write(true).truncate(true).create(true).open(filepath)?;
     let mut file = BufWriter::new(file);
 
+    let mut smf = smf.clone();
+    smf.recalculate_length();
     let binary = smf.raw();
 
     file.write(&binary)?;
