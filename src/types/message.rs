@@ -122,7 +122,7 @@ impl SmfElement for ChannelVoiceMessage {
             ControlChange{cc, value, ..} => vec![self.status_byte(), cc, value],
             ProgramChange{pc, ..} => vec![self.status_byte(), pc],
             ChannelKeyPressure{vel, ..} => vec![self.status_byte(), vel],
-            PitchBend{lsb, msb, ..} => vec![self.status_byte(), lsb, msb]
+            PitchBend{lsb, msb, ..} => vec![self.status_byte(), msb, lsb]
         }
     }
 }
